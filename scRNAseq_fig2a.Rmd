@@ -1,0 +1,37 @@
+---
+title: "scRNA-seq"
+output: html_document
+date: "2025-12-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+Fig 2A: 
+Goal: identify 8CLCs in naive hESC cultures
+Cell types: control vs LINE1 KD RSeT + DT hESCs
+
+
+```{r setup}
+library(Seurat)
+library(dplyr)
+library(ggplot2)
+library(GEOquery)
+```
+
+## Load Data
+GEO data structure:
+1) Platform (GPL): Describes array design, probes, or detectable elements
+2) Sample (GSM): Contains individual experiment measurements
+3) Series (GSE): Groups related samples together, typically representing a complete study
+
+1st error: timeout when downloading large datasets from GEO (11.3 GB). Suggested solution: download manually from GEO website and load locally.
+
+Due to time constraints, I will analyze "D:\Integrated Sciences\bioinfo\GEO data\GSE232939-GPL16791_series_matrix.txt.gz" 1st.
+```{r}
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
