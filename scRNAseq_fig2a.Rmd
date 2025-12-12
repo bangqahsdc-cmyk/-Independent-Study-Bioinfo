@@ -18,7 +18,9 @@ Cell types: control vs LINE1 KD RSeT + DT hESCs
 library(Seurat)
 library(dplyr)
 library(ggplot2)
-library(GEOquery)
+
+#BiocManager::install('glmGamPoi')
+#library(GEOquery)
 ```
 
 ## Load Data
@@ -29,9 +31,74 @@ GEO data structure:
 
 1st error: timeout when downloading large datasets from GEO (11.3 GB). Suggested solution: download manually from GEO website and load locally.
 
-Due to time constraints, I will analyze "D:\Integrated Sciences\bioinfo\GEO data\GSE232939-GPL16791_series_matrix.txt.gz" 1st.
-```{r}
+"D:\Integrated Sciences\bioinfo\GEO data\GSE232939-GPL16791_series_matrix.txt.gz"
+    :RSeT+DT,RSeTandprimedhESCs:H3K27ac/H3K27me3/H3K9me3-ChIP-seq
+GSE232938: subseries of GSE232939 cited in the paper that contains only scRNA-seq data
 
+##Setup the Seurat object
+Read10X(): folder must include 3 files:
+1) barcodes.tsv: cell barcodes
+2) features.tsv or genes.tsv: gene features
+3) matrix.mtx: expression matrix in Matrix Market format
+```{r}
+#SO: sense oligo that targets L1 (cannot actually KD L1)
+SO_L1 = Read10X("D:/Integrated Sciences/bioinfo/GEO data/scRNAseq/SO_L1")
+
+KD_L1 = Read10X("D:/Integrated Sciences/bioinfo/GEO data/scRNAseq/KD_L1")
+
+#add colnames to differentiate between SO and KD samples
+colnames(SO_L1) = paste0("SO_", colnames(SO_L1))
+colnames(KD_L1) = paste0("KD_", colnames(KD_L1))
+
+#create Seurat object: will contain data + analysis results
+##min.cells = 20: include features detected in at least 20 cells
+##min.features = 200: include cells where at least 200 features are detected
+seurat_SO = CreateSeuratObject(SO_L1, min.cells = 20, min.features = 200)
+seurat_KD = CreateSeuratObject(KD_L1, min.cells = 20, min.features = 200)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+##Pre-process the data
+Commonly used QC metrics:
+1) the number of genes detected per cell (nFeature_RNA)
+2) the total number of molecules detected per cell (nCount_RNA)
+   low-quality cells/empty droplets -> low values
+   doublets/multiplets -> high values
+3) the percentage of reads that map to mitochondrial genes (percent.mt)
+   low-quality/dying cells -> excessive mitochondrial contamination
+```{r}
+##QC
+#calculate percentage of reads that are mitochondrial genes
+#[[ ]]: create new columns in object metadata
+seurat_SO[["percent.mt"]] = PercentageFeatureSet(seurat_SO, pattern = "^MT-")
+seurat_KD[["percent.mt"]] = PercentageFeatureSet(seurat_KD, pattern = "^MT-")
+seurat_ASO = merge(seurat_SO, y = seurat_KD)
+
+#nFeature_RNA & nCount_RNA are calculated by default (when we did CreateSeuratObject)
+#visualize QC metrics as violin plots
+VlnPlot(seurat_ASO, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+```
+I don't know why they chose these cut-off values
+```{r}
+### Cell Filter
+
+seurat_ASO = subset(seurat_ASO, subset = nFeature_RNA >= 5000)
+seurat_ASO = subset(seurat_ASO, subset = nCount_RNA < 100000)
+seurat_ASO = subset(seurat_ASO, subset = percent.mt < 15)
+seurat_ASO = seurat_ASO[grep("^MT-", rownames(seurat_ASO), invert = T),]
+```
+###Cluster the cells
+1) Normalize the data
+Biological heterogeneity in single-cell RNA-seq data is often confounded by technical factors including sequencing depth.
+```{r}
+seurat_ASO <- SCTransform(seurat_ASO, vst.flavor = "v2", verbose = FALSE, conserve.memory = TRUE) #conserve.memory = TRUE to reduce memory usage
+seurat_ASO <- RunPCA(object = seurat_ASO, npcs = 50, verbose = FALSE) %>%
+              RunUMAP(reduction = "pca", dims = 1:20, verbose = FALSE) %>%
+              FindNeighbors(reduction = "pca", dims = 1:20, verbose = FALSE) %>%
+              FindClusters(resolution = 1, verbose = FALSE)
+
+DimPlot(seurat_ASO, label = TRUE)
+#png("umap.png", width = 2000, height = 2000, res = 300)
+#print(DimPlot(seurat_ASO, label = TRUE))
+#dev.off()
+
+```
