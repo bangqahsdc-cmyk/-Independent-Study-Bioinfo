@@ -102,3 +102,12 @@ DimPlot(seurat_ASO, label = TRUE)
 #dev.off()
 
 ```
+```{r}
+DimPlot(seurat_ASO, label = T) + NoLegend()
+saveRDS(seurat_ASO, file = "../scRNAseq.rds")
+```
+###Try to recreate Fig 2A
+```{r}
+FeaturePlot(seurat_ASO,
+            features = c("TPRX1", "ZSCAN4", "DPPA3", "ZNF280A", "SLC34A2")) 
+```
